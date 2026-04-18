@@ -1,48 +1,48 @@
 # VS-Code-plagin
 
-## Code Recovery Extension
+## Расширение «Восстановление кода»
 
-A VS Code extension that restores deleted code **character by character** using the last git commit. Each keypress you make recovers the next deleted character — no matter which key you press.
+Это расширение для VS Code восстанавливает удалённый код **посимвольно** из последнего git-коммита. Каждое нажатие клавиши возвращает следующий удалённый символ — неважно, какую именно клавишу вы нажали.
 
-### How it works
+### Как это работает
 
-1. You accidentally delete some code (e.g. a whole function).
-2. Activate recovery mode with **Ctrl+Shift+R** (⌘+Shift+R on Mac).
-3. Start pressing **any keys** on the keyboard. Each keypress inserts the next deleted character back into the file — instead of whatever key you pressed.
-4. Keep pressing until your code is fully restored, or press **Ctrl+Shift+R** again to stop.
+1. Вы случайно удаляете код (например, целую функцию).
+2. Включаете режим восстановления: **Ctrl+Shift+R** (⌘+Shift+R на Mac).
+3. Начинаете нажимать **любые клавиши**. Каждое нажатие вставляет следующий удалённый символ в файл вместо введённого символа.
+4. Продолжаете нажимать, пока код полностью не восстановится, или снова жмёте **Ctrl+Shift+R**, чтобы остановить процесс.
 
-The extension compares the current file with the last committed version in git and computes the missing characters using a diff algorithm. Characters are restored in the order they appeared in the committed file.
+Расширение сравнивает текущий файл с его последней закоммиченной версией и вычисляет недостающие символы через diff-алгоритм. Символы возвращаются в порядке, в котором они были в закоммиченной версии файла.
 
-### Commands
+### Команды
 
-| Command | Keybinding | Description |
-|---------|-----------|-------------|
-| **Toggle Code Recovery Mode** | Ctrl+Shift+R / ⌘+Shift+R | Start or stop recovery mode |
-| **Start Code Recovery** | — | Start recovery for the active file |
-| **Stop Code Recovery** | — | Stop recovery mode |
+| Команда | Горячая клавиша | Описание |
+|---------|------------------|----------|
+| **Переключить режим восстановления кода** | Ctrl+Shift+R / ⌘+Shift+R | Запустить или остановить режим восстановления |
+| **Запустить восстановление кода** | — | Запустить восстановление для активного файла |
+| **Остановить восстановление кода** | — | Остановить режим восстановления |
 
-All commands are available via the Command Palette (`Ctrl+Shift+P`) under the **Code Recovery** category.
+Все команды доступны через палитру команд (`Ctrl+Shift+P`) в категории **Восстановление кода**.
 
-### Status bar
+### Строка состояния
 
-While recovery mode is active, the status bar shows how many characters have been restored and how many remain:
+Пока режим активен, в строке состояния показывается, сколько символов уже восстановлено и сколько осталось:
 
 ```
-⟳ Recovery: 10 restored, 42 remaining
+⟳ Восстановление: 10 восстановлено, 42 осталось
 ```
 
-Clicking the status bar item toggles recovery mode.
+Нажатие на элемент в строке состояния переключает режим восстановления.
 
-### Requirements
+### Требования
 
-- The file must belong to a git repository.
-- The file must have been committed at least once (`git commit`).
+- Файл должен находиться в git-репозитории.
+- Файл должен быть закоммичен хотя бы один раз (`git commit`).
 
-### Development
+### Разработка
 
 ```bash
 npm install
-npm run compile   # Compile TypeScript
-npm test          # Run unit tests
-npm run watch     # Watch mode
+npm run compile   # Сборка TypeScript
+npm test          # Запуск unit-тестов
+npm run watch     # Режим отслеживания изменений
 ```

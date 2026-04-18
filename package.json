@@ -1,7 +1,7 @@
 {
   "name": "code-recovery",
-  "displayName": "Code Recovery",
-  "description": "Restore deleted code character by character using the last git commit. Each keypress recovers the next deleted character.",
+  "displayName": "Восстановление кода",
+  "description": "Восстанавливает удалённый код посимвольно из последнего git-коммита. Каждое нажатие клавиши возвращает следующий удалённый символ.",
   "version": "0.1.0",
   "engines": {
     "vscode": "^1.85.0"
@@ -21,18 +21,18 @@
     "commands": [
       {
         "command": "codeRecovery.start",
-        "title": "Start Code Recovery",
-        "category": "Code Recovery"
+        "title": "Запустить восстановление кода",
+        "category": "Восстановление кода"
       },
       {
         "command": "codeRecovery.stop",
-        "title": "Stop Code Recovery",
-        "category": "Code Recovery"
+        "title": "Остановить восстановление кода",
+        "category": "Восстановление кода"
       },
       {
         "command": "codeRecovery.toggle",
-        "title": "Toggle Code Recovery Mode",
-        "category": "Code Recovery"
+        "title": "Переключить режим восстановления кода",
+        "category": "Восстановление кода"
       }
     ],
     "keybindings": [

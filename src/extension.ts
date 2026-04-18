@@ -125,17 +125,17 @@ function computeDeletedChars(committed: string, current: string): string[] {
  */
 function updateStatusBar(): void {
   if (recoverySession === null) {
-    statusBarItem.text = '$(circle-slash) Recovery: Off';
-    statusBarItem.tooltip = 'Code Recovery is inactive. Use Ctrl+Shift+R to activate.';
+    statusBarItem.text = '$(circle-slash) Восстановление: выкл.';
+    statusBarItem.tooltip = 'Режим восстановления выключен. Нажмите Ctrl+Shift+R для запуска.';
     statusBarItem.backgroundColor = undefined;
   } else {
     const remaining = recoverySession.pendingChars.length;
     const restored = recoverySession.restoredCount;
-    statusBarItem.text = `$(sync~spin) Recovery: ${restored} restored, ${remaining} remaining`;
+    statusBarItem.text = `$(sync~spin) Восстановление: ${restored} восстановлено, ${remaining} осталось`;
     statusBarItem.tooltip =
-      `Code Recovery is active.\nPress any key to restore the next deleted character.\n` +
-      `Restored: ${restored} | Remaining: ${remaining}\n` +
-      `Use Ctrl+Shift+R or run "Stop Code Recovery" to exit.`;
+      `Режим восстановления активен.\nНажмите любую клавишу, чтобы вернуть следующий удалённый символ.\n` +
+      `Восстановлено: ${restored} | Осталось: ${remaining}\n` +
+      `Нажмите Ctrl+Shift+R или выполните команду «Остановить восстановление кода».`;
     statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
   }
 }
@@ -146,21 +146,21 @@ function updateStatusBar(): void {
 async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    vscode.window.showErrorMessage('Code Recovery: No active editor found.');
+    vscode.window.showErrorMessage('Восстановление кода: активный редактор не найден.');
     return;
   }
 
   const filePath = editor.document.fileName;
 
   if (editor.document.isUntitled) {
-    vscode.window.showErrorMessage('Code Recovery: Cannot recover an unsaved file.');
+    vscode.window.showErrorMessage('Восстановление кода: нельзя восстановить несохранённый файл.');
     return;
   }
 
   const gitRoot = getGitRoot(filePath);
   if (!gitRoot) {
     vscode.window.showErrorMessage(
-      'Code Recovery: This file is not inside a git repository.',
+      'Восстановление кода: файл находится вне git-репозитория.',
     );
     return;
   }
@@ -168,8 +168,8 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
   const committedContent = getLastCommitContent(filePath, gitRoot);
   if (committedContent === null) {
     vscode.window.showErrorMessage(
-      'Code Recovery: Could not retrieve the last committed version of this file. ' +
-      'Make sure the file has been committed at least once.',
+      'Восстановление кода: не удалось получить последнюю закоммиченную версию файла. ' +
+      'Убедитесь, что файл был закоммичен хотя бы один раз.',
     );
     return;
   }
@@ -178,7 +178,7 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
 
   if (committedContent === currentContent) {
     vscode.window.showInformationMessage(
-      'Code Recovery: The file matches the last commit — nothing to recover.',
+      'Восстановление кода: файл совпадает с последним коммитом, восстанавливать нечего.',
     );
     return;
   }
@@ -187,7 +187,7 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
 
   if (deletedChars.length === 0) {
     vscode.window.showInformationMessage(
-      'Code Recovery: No deleted characters found compared to the last commit.',
+      'Восстановление кода: удалённые символы относительно последнего коммита не найдены.',
     );
     return;
   }
@@ -231,7 +231,7 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
       const totalRestored = recoverySession.restoredCount;
       stopRecovery();
       vscode.window.showInformationMessage(
-        `Code Recovery: All ${totalRestored} deleted character(s) have been restored!`,
+        `Восстановление кода: восстановлены все удалённые символы (${totalRestored}).`,
       );
       return;
     }
@@ -243,8 +243,8 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
 
   updateStatusBar();
   vscode.window.showInformationMessage(
-    `Code Recovery: Active — ${deletedChars.length} character(s) to restore. ` +
-    `Press any key to restore them one by one. Use Ctrl+Shift+R to stop.`,
+    `Восстановление кода: режим включён — к восстановлению ${deletedChars.length} символов. ` +
+    `Нажимайте любые клавиши, чтобы возвращать символы по одному. Для остановки нажмите Ctrl+Shift+R.`,
   );
 }
 
@@ -276,14 +276,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeRecovery.stop', () => {
       if (recoverySession === null) {
-        vscode.window.showInformationMessage('Code Recovery: Recovery mode is not active.');
+        vscode.window.showInformationMessage('Восстановление кода: режим не активен.');
         return;
       }
       const restored = recoverySession.restoredCount;
       const remaining = recoverySession.pendingChars.length;
       stopRecovery();
       vscode.window.showInformationMessage(
-        `Code Recovery: Stopped. Restored ${restored} character(s), ${remaining} remaining.`,
+        `Восстановление кода: остановлено. Восстановлено ${restored}, осталось ${remaining}.`,
       );
     }),
   );
@@ -295,7 +295,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const remaining = recoverySession.pendingChars.length;
         stopRecovery();
         vscode.window.showInformationMessage(
-          `Code Recovery: Stopped. Restored ${restored} character(s), ${remaining} remaining.`,
+          `Восстановление кода: остановлено. Восстановлено ${restored}, осталось ${remaining}.`,
         );
       } else {
         startRecovery(context);
@@ -310,7 +310,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const restored = recoverySession.restoredCount;
         stopRecovery();
         vscode.window.showInformationMessage(
-          `Code Recovery: Stopped (editor changed). Restored ${restored} character(s).`,
+          `Восстановление кода: остановлено (редактор изменён). Восстановлено ${restored}.`,
         );
       }
     }),
