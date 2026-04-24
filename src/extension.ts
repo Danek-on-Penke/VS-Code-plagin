@@ -8,8 +8,6 @@ import * as path from 'path';
 interface RecoverySession {
   /** Characters to be restored, in order. */
   pendingChars: string[];
-  /** Number of characters already restored in this session. */
-  restoredCount: number;
   /** The file path being recovered. */
   filePath: string;
   /** The editor that was active when recovery started. */
@@ -17,7 +15,6 @@ interface RecoverySession {
 }
 
 let recoverySession: RecoverySession | null = null;
-let statusBarItem: vscode.StatusBarItem;
 let typeCommandDisposable: vscode.Disposable | null = null;
 
 /**
@@ -56,10 +53,62 @@ function getLastCommitContent(filePath: string, gitRoot: string): string | null 
 }
 
 /**
+ * Splits text into line chunks preserving trailing '\n' on each complete line.
+ */
+function splitLineChunks(text: string): string[] {
+  if (text.length === 0) {
+    return [];
+  }
+  const parts = text.split('\n');
+  const chunks: string[] = [];
+  for (let idx = 0; idx < parts.length - 1; idx++) {
+    chunks.push(`${parts[idx]}\n`);
+  }
+  const lastPart = parts[parts.length - 1];
+  if (lastPart.length > 0) {
+    chunks.push(lastPart);
+  }
+  return chunks;
+}
+
+/**
+ * Tries to extract deleted characters by treating files as line sequences first.
+ * Returns null when current is not a subsequence of committed at line level.
+ */
+function computeDeletedLinesFirst(committed: string, current: string): string[] | null {
+  const committedLines = splitLineChunks(committed);
+  const currentLines = splitLineChunks(current);
+  const deletedChars: string[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < committedLines.length && j < currentLines.length) {
+    if (committedLines[i] === currentLines[j]) {
+      i++;
+      j++;
+    } else {
+      for (const ch of committedLines[i]) {
+        deletedChars.push(ch);
+      }
+      i++;
+    }
+  }
+  while (i < committedLines.length) {
+    for (const ch of committedLines[i]) {
+      deletedChars.push(ch);
+    }
+    i++;
+  }
+  if (j === currentLines.length) {
+    return deletedChars;
+  }
+  return null;
+}
+
+/**
  * Computes the list of characters that are in `committed` but not (yet) in `current`,
  * preserving their original order from the committed version.
  *
- * Uses a simple LCS (longest common subsequence) diff to find deleted characters.
+ * Uses line-level subsequence extraction first, then falls back to LCS.
  */
 function computeDeletedChars(committed: string, current: string): string[] {
   // For very large files, limit the comparison range to avoid excessive memory usage.
@@ -67,50 +116,56 @@ function computeDeletedChars(committed: string, current: string): string[] {
   const a = committed.slice(0, MAX_LEN);
   const b = current.slice(0, MAX_LEN);
 
+  const lineBasedDeleted = computeDeletedLinesFirst(a, b);
+  if (lineBasedDeleted !== null) {
+    const deleted = [...lineBasedDeleted];
+    if (committed.length > MAX_LEN) {
+      for (const ch of committed.slice(MAX_LEN)) {
+        deleted.push(ch);
+      }
+    }
+    return deleted;
+  }
+
   const m = a.length;
   const n = b.length;
-
   const deleted: string[] = [];
 
-  // Build the full DP table for LCS, then backtrack to find deleted characters.
+  // Fallback to LCS when current content is not a subsequence of committed.
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
+  for (let row = 1; row <= m; row++) {
+    for (let col = 1; col <= n; col++) {
+      if (a[row - 1] === b[col - 1]) {
+        dp[row][col] = dp[row - 1][col - 1] + 1;
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        dp[row][col] = Math.max(dp[row - 1][col], dp[row][col - 1]);
       }
     }
   }
 
-  // Backtrack through the DP table to collect deleted characters.
-  let i = m;
-  let j = n;
+  let row = m;
+  let col = n;
   const deletedReversed: string[] = [];
-  while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      i--;
-      j--;
-    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-      // Character a[i-1] is deleted (not in b).
-      deletedReversed.push(a[i - 1]);
-      i--;
+  while (row > 0 && col > 0) {
+    if (a[row - 1] === b[col - 1]) {
+      row--;
+      col--;
+    } else if (dp[row - 1][col] >= dp[row][col - 1]) {
+      deletedReversed.push(a[row - 1]);
+      row--;
     } else {
-      j--;
+      col--;
     }
   }
-  while (i > 0) {
-    deletedReversed.push(a[i - 1]);
-    i--;
+  while (row > 0) {
+    deletedReversed.push(a[row - 1]);
+    row--;
   }
 
-  // Reverse to get the correct order.
   for (let k = deletedReversed.length - 1; k >= 0; k--) {
     deleted.push(deletedReversed[k]);
   }
 
-  // Also include characters from the part of `committed` beyond MAX_LEN.
   if (committed.length > MAX_LEN) {
     for (const ch of committed.slice(MAX_LEN)) {
       deleted.push(ch);
@@ -118,26 +173,6 @@ function computeDeletedChars(committed: string, current: string): string[] {
   }
 
   return deleted;
-}
-
-/**
- * Updates the status bar to reflect the current recovery state.
- */
-function updateStatusBar(): void {
-  if (recoverySession === null) {
-    statusBarItem.text = '$(circle-slash) Восстановление: выкл.';
-    statusBarItem.tooltip = 'Режим восстановления выключен. Нажмите Ctrl+Shift+R для запуска.';
-    statusBarItem.backgroundColor = undefined;
-  } else {
-    const remaining = recoverySession.pendingChars.length;
-    const restored = recoverySession.restoredCount;
-    statusBarItem.text = `$(sync~spin) Восстановление: ${restored} восстановлено, ${remaining} осталось`;
-    statusBarItem.tooltip =
-      `Режим восстановления активен.\nНажмите любую клавишу, чтобы вернуть следующий удалённый символ.\n` +
-      `Восстановлено: ${restored} | Осталось: ${remaining}\n` +
-      `Нажмите Ctrl+Shift+R или выполните команду «Остановить восстановление кода».`;
-    statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-  }
 }
 
 /**
@@ -197,7 +232,6 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
 
   recoverySession = {
     pendingChars: deletedChars,
-    restoredCount: 0,
     filePath,
     editor,
   };
@@ -220,7 +254,6 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
     }
 
     const nextChar = recoverySession.pendingChars.shift()!;
-    recoverySession.restoredCount++;
 
     await sessionEditor.edit((editBuilder) => {
       // Insert the next deleted character at the current cursor position.
@@ -228,23 +261,19 @@ async function startRecovery(context: vscode.ExtensionContext): Promise<void> {
     });
 
     if (recoverySession.pendingChars.length === 0) {
-      const totalRestored = recoverySession.restoredCount;
       stopRecovery();
       vscode.window.showInformationMessage(
-        `Восстановление кода: восстановлены все удалённые символы (${totalRestored}).`,
+        'Восстановление кода: восстановление завершено.',
       );
       return;
     }
-
-    updateStatusBar();
   });
 
   context.subscriptions.push(typeCommandDisposable);
 
-  updateStatusBar();
   vscode.window.showInformationMessage(
-    `Восстановление кода: режим включён — к восстановлению ${deletedChars.length} символов. ` +
-    `Нажимайте любые клавиши, чтобы возвращать символы по одному. Для остановки нажмите Ctrl+Shift+R.`,
+    'Восстановление кода: режим включён. Нажимайте любые клавиши для пошагового восстановления. ' +
+    'Для остановки нажмите Ctrl+Shift+R.',
   );
 }
 
@@ -257,17 +286,9 @@ function stopRecovery(): void {
     typeCommandDisposable = null;
   }
   recoverySession = null;
-  updateStatusBar();
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Create the status bar item.
-  statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBarItem.command = 'codeRecovery.toggle';
-  statusBarItem.show();
-  context.subscriptions.push(statusBarItem);
-  updateStatusBar();
-
   // Register commands.
   context.subscriptions.push(
     vscode.commands.registerCommand('codeRecovery.start', () => startRecovery(context)),
@@ -279,24 +300,16 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showInformationMessage('Восстановление кода: режим не активен.');
         return;
       }
-      const restored = recoverySession.restoredCount;
-      const remaining = recoverySession.pendingChars.length;
       stopRecovery();
-      vscode.window.showInformationMessage(
-        `Восстановление кода: остановлено. Восстановлено ${restored}, осталось ${remaining}.`,
-      );
+      vscode.window.showInformationMessage('Восстановление кода: восстановление остановлено.');
     }),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('codeRecovery.toggle', () => {
       if (recoverySession !== null) {
-        const restored = recoverySession.restoredCount;
-        const remaining = recoverySession.pendingChars.length;
         stopRecovery();
-        vscode.window.showInformationMessage(
-          `Восстановление кода: остановлено. Восстановлено ${restored}, осталось ${remaining}.`,
-        );
+        vscode.window.showInformationMessage('Восстановление кода: восстановление остановлено.');
       } else {
         startRecovery(context);
       }
@@ -307,11 +320,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => {
       if (recoverySession !== null) {
-        const restored = recoverySession.restoredCount;
         stopRecovery();
-        vscode.window.showInformationMessage(
-          `Восстановление кода: остановлено (редактор изменён). Восстановлено ${restored}.`,
-        );
+        vscode.window.showInformationMessage('Восстановление кода: восстановление остановлено (редактор изменён).');
       }
     }),
   );
