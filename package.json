@@ -1,0 +1,70 @@
+{
+  "name": "code-recovery",
+  "displayName": "Восстановление кода",
+  "description": "Восстанавливает удалённый код посимвольно из последнего git-коммита. Каждое нажатие клавиши возвращает следующий удалённый символ.",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "recovery",
+    "restore",
+    "undo"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeRecovery.start",
+        "title": "Запустить восстановление кода",
+        "category": "Восстановление кода"
+      },
+      {
+        "command": "codeRecovery.stop",
+        "title": "Остановить восстановление кода",
+        "category": "Восстановление кода"
+      },
+      {
+        "command": "codeRecovery.toggle",
+        "title": "Переключить режим восстановления кода",
+        "category": "Восстановление кода"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codeRecovery.toggle",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeRecovery.toggle",
+          "group": "1_modification"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node out/test/computeDeletedChars.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}
